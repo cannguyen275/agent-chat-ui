@@ -4,6 +4,7 @@ import React, {
   ReactNode,
   useState,
   useEffect,
+  useCallback,
 } from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import { type Message } from "@langchain/langgraph-sdk";
@@ -20,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowRight } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
 import { getApiKey } from "@/lib/api-key";
+import { fetchAgentSchema, supportsImageInput, type AgentSchema } from "@/lib/agent-schema";
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
 
@@ -36,7 +38,11 @@ const useTypedStream = useStream<
   }
 >;
 
-type StreamContextType = ReturnType<typeof useTypedStream>;
+type StreamContextType = ReturnType<typeof useTypedStream> & {
+  supportsImageInput: boolean;
+  agentSchema: AgentSchema | null;
+  fetchAgentSchema: () => Promise<void>;
+};
 const StreamContext = createContext<StreamContextType | undefined>(undefined);
 
 async function sleep(ms = 4000) {
@@ -76,6 +82,8 @@ const StreamSession = ({
 }) => {
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
+  const [agentSchema, setAgentSchema] = useState<AgentSchema | null>(null);
+  const [supportsImages, setSupportsImages] = useState(false);
   const streamValue = useTypedStream({
     apiUrl,
     apiKey: apiKey ?? undefined,
@@ -95,6 +103,41 @@ const StreamSession = ({
     },
   });
 
+  // Fetch agent schema and check if it supports image input
+  const fetchSchema = useCallback(async () => {
+    try {
+      console.log("Fetching agent schema for:", assistantId);
+      
+      // Special case for agriculture_agent - we know it supports images
+      if (assistantId === "agriculture_agent") {
+        console.log("Special case: agriculture_agent detected, enabling image support");
+        setAgentSchema(null);
+        setSupportsImages(true);
+        return;
+      }
+      
+      const schema = await fetchAgentSchema(apiUrl, apiKey ?? undefined, assistantId);
+      console.log("Agent schema:", schema);
+      setAgentSchema(schema);
+      const supportsImages = supportsImageInput(schema);
+      console.log("Agent supports images:", supportsImages);
+      setSupportsImages(supportsImages);
+    } catch (error) {
+      console.error("Failed to fetch agent schema:", error);
+      
+      // Special case for agriculture_agent - we know it supports images
+      // This handles the case where the schema fetch fails but we still want to enable image support
+      if (assistantId === "agriculture_agent") {
+        console.log("Schema fetch failed but enabling image support for agriculture_agent");
+        setSupportsImages(true);
+      } else {
+        setSupportsImages(false);
+      }
+      
+      setAgentSchema(null);
+    }
+  }, [apiUrl, apiKey, assistantId]);
+
   useEffect(() => {
     checkGraphStatus(apiUrl, apiKey).then((ok) => {
       if (!ok) {
@@ -109,12 +152,22 @@ const StreamSession = ({
           richColors: true,
           closeButton: true,
         });
+      } else {
+        // If connection is successful, fetch the agent schema
+        fetchSchema();
       }
     });
-  }, [apiKey, apiUrl]);
+  }, [apiKey, apiUrl, fetchSchema]);
 
   return (
-    <StreamContext.Provider value={streamValue}>
+    <StreamContext.Provider 
+      value={{
+        ...streamValue,
+        supportsImageInput: supportsImages,
+        agentSchema,
+        fetchAgentSchema: fetchSchema,
+      }}
+    >
       {children}
     </StreamContext.Provider>
   );

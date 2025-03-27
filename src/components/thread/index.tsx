@@ -1,10 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useStreamContext } from "@/providers/Stream";
-import { useState, FormEvent } from "react";
+import { FormEvent } from "react";
 import { Button } from "../ui/button";
+import { ImageUpload } from "./image-upload";
 import { Checkpoint, Message } from "@langchain/langgraph-sdk";
 import { AssistantMessage, AssistantMessageLoading } from "./messages/ai";
 import { HumanMessage } from "./messages/human";
@@ -79,6 +80,11 @@ export function Thread() {
   );
   const [input, setInput] = useState("");
   const [firstTokenReceived, setFirstTokenReceived] = useState(false);
+  const [imageData, setImageData] = useState<{
+    base64: string;
+    mimeType: string;
+    originalName: string;
+  } | null>(null);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
 
   const stream = useStreamContext();
@@ -131,32 +137,71 @@ export function Thread() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !imageData) || isLoading) return;
     setFirstTokenReceived(false);
 
-    const newHumanMessage: Message = {
-      id: uuidv4(),
-      type: "human",
-      content: input,
-    };
-
     const toolMessages = ensureToolCallsHaveResponses(stream.messages);
-    stream.submit(
-      { messages: [...toolMessages, newHumanMessage] },
-      {
-        streamMode: ["values"],
-        optimisticValues: (prev) => ({
-          ...prev,
-          messages: [
-            ...(prev.messages ?? []),
-            ...toolMessages,
-            newHumanMessage,
-          ],
-        }),
-      },
-    );
+    
+    // If we have an image, include it in the submission
+    if (imageData) {
+      console.log("Submitting message with image:", imageData.originalName);
+      
+      // Create a message with the text content
+      const newHumanMessage: Message = {
+        id: uuidv4(),
+        type: "human",
+        content: input,
+      };
+      
+      // Create a submission object with messages and image
+      const submission: any = { 
+        messages: [...toolMessages, newHumanMessage]
+      };
+      
+      // Add the image field
+      submission.image = imageData.base64;
+      
+      // Submit with the image
+      stream.submit(
+        submission,
+        {
+          streamMode: ["values"],
+          optimisticValues: (prev) => ({
+            ...prev,
+            messages: [
+              ...(prev.messages ?? []),
+              ...toolMessages,
+              newHumanMessage,
+            ],
+          }),
+        },
+      );
+    } else {
+      // No image, just send the message
+      const newHumanMessage: Message = {
+        id: uuidv4(),
+        type: "human",
+        content: input,
+      };
+      
+      stream.submit(
+        { messages: [...toolMessages, newHumanMessage] },
+        {
+          streamMode: ["values"],
+          optimisticValues: (prev) => ({
+            ...prev,
+            messages: [
+              ...(prev.messages ?? []),
+              ...toolMessages,
+              newHumanMessage,
+            ],
+          }),
+        },
+      );
+    }
 
     setInput("");
+    setImageData(null);
   };
 
   const handleRegenerate = (
@@ -351,7 +396,7 @@ export function Thread() {
                     />
 
                     <div className="flex items-center justify-between p-2 pt-4">
-                      <div>
+                      <div className="flex items-center gap-4">
                         <div className="flex items-center space-x-2">
                           <Switch
                             id="render-tool-calls"
@@ -365,6 +410,25 @@ export function Thread() {
                             Hide Tool Calls
                           </Label>
                         </div>
+                        
+                        {/* Only show image upload if agent supports it */}
+                        <div className="flex items-center">
+                          {/* Log image support status */}
+                          {(() => {
+                            console.log("Agent supports images (Thread):", stream.supportsImageInput);
+                            return null;
+                          })()}
+                          {stream.supportsImageInput ? (
+                            <ImageUpload 
+                              onImageSelected={setImageData}
+                            />
+                          ) : (
+                            <div className="hidden">
+                              {/* For debugging - this won't be visible */}
+                              Image upload not available - agent doesn't support images
+                            </div>
+                          )}
+                        </div>
                       </div>
                       {stream.isLoading ? (
                         <Button key="stop" onClick={() => stream.stop()}>
@@ -375,7 +439,7 @@ export function Thread() {
                         <Button
                           type="submit"
                           className="transition-all shadow-md"
-                          disabled={isLoading || !input.trim()}
+                          disabled={isLoading || (!input.trim() && !imageData)}
                         >
                           Send
                         </Button>

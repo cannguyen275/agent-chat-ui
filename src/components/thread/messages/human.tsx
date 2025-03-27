@@ -1,7 +1,7 @@
 import { useStreamContext } from "@/providers/Stream";
 import { Message } from "@langchain/langgraph-sdk";
 import { useState } from "react";
-import { getContentString } from "../utils";
+import { getContentString, getImageUrlFromContent } from "../utils";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { BranchSwitcher, CommandBar } from "./shared";
@@ -84,9 +84,27 @@ export function HumanMessage({
             onSubmit={handleSubmitEdit}
           />
         ) : (
-          <p className="text-right px-4 py-2 rounded-3xl bg-muted">
-            {contentString}
-          </p>
+          <div className="flex flex-col gap-2 items-end">
+            <p className="text-right px-4 py-2 rounded-3xl bg-muted">
+              {contentString}
+            </p>
+            
+            {/* Display image if present */}
+            {message.content && typeof message.content !== 'string' && (
+              <>
+                {(() => {
+                  const imageUrl = getImageUrlFromContent(message.content);
+                  return imageUrl ? (
+                    <img 
+                      src={imageUrl} 
+                      alt="User uploaded image"
+                      className="max-w-xs max-h-64 rounded-md object-contain"
+                    />
+                  ) : null;
+                })()}
+              </>
+            )}
+          </div>
         )}
 
         <div

@@ -1,7 +1,7 @@
 import { parsePartialJson } from "@langchain/core/output_parsers";
 import { useStreamContext } from "@/providers/Stream";
 import { AIMessage, Checkpoint, Message } from "@langchain/langgraph-sdk";
-import { getContentString } from "../utils";
+import { getContentString, getImageUrlFromContent } from "../utils";
 import { BranchSwitcher, CommandBar } from "./shared";
 import { MarkdownText } from "../markdown-text";
 import { LoadExternalComponent } from "@langchain/langgraph-sdk/react-ui";
@@ -116,6 +116,24 @@ export function AssistantMessage({
             <div className="py-1">
               <MarkdownText>{contentString}</MarkdownText>
             </div>
+          )}
+          
+          {/* Display image if present in AI response */}
+          {message.content && typeof message.content !== 'string' && (
+            <>
+              {(() => {
+                const imageUrl = getImageUrlFromContent(message.content);
+                return imageUrl ? (
+                  <div className="py-1">
+                    <img 
+                      src={imageUrl} 
+                      alt="AI generated image"
+                      className="max-w-md max-h-96 rounded-md object-contain"
+                    />
+                  </div>
+                ) : null;
+              })()}
+            </>
           )}
 
           {!hideToolCalls && (
