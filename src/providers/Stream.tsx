@@ -16,7 +16,7 @@ import {
 import { useQueryState } from "nuqs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { LangGraphLogoSVG } from "@/components/icons/langgraph";
+import { AgrozLogo } from "../components/icons/agroz";
 import { Label } from "@/components/ui/label";
 import { ArrowRight } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -194,13 +194,13 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
         <div className="animate-in fade-in-0 zoom-in-95 flex flex-col border bg-background shadow-lg rounded-lg max-w-3xl">
           <div className="flex flex-col gap-2 mt-14 p-6 border-b">
             <div className="flex items-start flex-col gap-2">
-              <LangGraphLogoSVG className="h-7" />
+              <AgrozLogo className="h-7" />
               <h1 className="text-xl font-semibold tracking-tight">
-                Agent Chat
+                Agroz Chat
               </h1>
             </div>
             <p className="text-muted-foreground">
-              Welcome to Agent Chat! Before you get started, you need to enter
+              Welcome to Agroz Chat! Before you get started, you need to enter
               the URL of the deployment and the assistant / graph ID.
             </p>
           </div>
